@@ -1,0 +1,238 @@
+#traffic lights:
+ 
+import RPi.GPIO as GPIO
+import time
+ 
+GPIO.setmode(GPIO.BOARD)
+GPIO.setwarnings(False)
+GPIO.setup(8,GPIO.OUT)
+GPIO.setup(10,GPIO.OUT)
+GPIO.setup(12,GPIO.OUT)
+ 
+while True:
+    print ("led on")
+    GPIO.output(8,True)
+    time.sleep(0.5)
+    print ("led off")
+    GPIO.output(8,False)
+    time.sleep(0.5)
+    print ("led on")
+    GPIO.output(10,True)
+    time.sleep(0.5)
+    print ("led off")
+    GPIO.output(10,False)
+    time.sleep(0.5)
+    print ("led on")
+    GPIO.output(12,True)
+    time.sleep(0.5)
+    print ("led off")
+    GPIO.output(12,False)
+    time.sleep(0.5)
+GPIO.cleanup()
+ 
+#webpage integeration:
+ 
+<html>
+<head>
+<meta name="viewport" content="width=device-width" />
+<title>LED Control</title>
+</head>
+        <body>
+        WEB PAGE ON PHP BASED GPIO Control:
+        <form method="get" action="newgpio.php">
+                <input type="submit" value="ON" name="on">
+                <input type="submit" value="OFF" name="off">
+        </form>
+        <?php
+        $setmode17 = shell_exec("/usr/local/bin/gpio -g mode 2 out");
+        if(isset($_GET['on'])){
+                $gpio_on = shell_exec("/usr/local/bin/gpio -g write 2 1");
+                echo "LED is on";
+        }
+        else if(isset($_GET['off'])){
+                $gpio_off = shell_exec("/usr/local/bin/gpio -g write 2 0");
+                echo "LED is off";
+        
+        }
+    
+ 
+        ?>
+        </body>
+</html>
+ 
+#gmail:
+ 
+from subprocess import call
+import time
+import os
+import glob
+import smtplib
+import base64
+from email.mime.image import MIMEImage
+from email.mime.multipart import MIMEMultipart
+import subprocess
+ 
+gmail_user = "mukilant.20cse@kongu.edu"
+gmail_pwd = ""
+FROM ='mukilant.20cse@kongu.edu'
+TO = ['mukilant87@gmail.com','mukilan.studydef@gmail.com'] #must be a list
+i=2
+print("testing")
+while (1):
+    i=i-1
+    #subprocess.Popen( "raspivid -o /home/pi/sample.mov", shell=True )
+    time.sleep(1)
+    print("I'am here")
+    msg = MIMEMultipart()
+    time.sleep(1)
+    msg['Subject'] ="testing msg sent from python"
+    time.sleep(1)
+    fp = open("E:/Documents/rose.jpg", 'rb')
+    time.sleep(1)
+    img = MIMEImage(fp.read())
+    time.sleep(1)
+    fp.close()
+    time.sleep(1)
+    msg.attach(img)
+    time.sleep(1)
+    try:
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+    #or port 465 doesn't seem to work!
+        print("smtp.gmail")
+        server.ehlo()
+        print( "ehlo")
+        server.starttls()
+        print ("starttls")
+        server.login(gmail_user, gmail_pwd)
+        print ("reading mail & password")
+        server.sendmail(FROM, TO, msg.as_string())
+        print ("from")
+        server.close()
+        print ('successfully sent the mail')
+    except:
+        print ("failed to send mail")
+ 
+#thingspeak,ultrasonic:
+ 
+import time
+import urllib.request
+import RPi.GPIO as GPIO
+trig = 2
+echo = 3
+ 
+Thing = "https://api.thingspeak.com/update?api_key=FSL36CWJ71VAQ4NI"
+GPIO.setwarnings(False)
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(trig,GPIO.OUT)
+GPIO.setup(echo,GPIO.IN)
+def read_distance():
+  GPIO.output(trig,True)
+  time.sleep(1)
+  GPIO.output(trig,False)
+  pulse_st = time.time()
+  
+  while GPIO.input(echo)==0:
+      pulse_st = time.time()
+  pulse_end = time.time()
+  while GPIO.input(echo)==1:
+      pulse_end = time.time()   
+  pulse_durat = pulse_end-pulse_st
+  distance = pulse_durat* 17150
+  distance = round(distance,2)
+  
+  return distance
+ 
+while True:
+    distance = read_distance()
+    print(distance)
+    url = Thing +'&field1={:.2f}'.format(distance)
+    urllib.request.urlopen(url)
+ 
+    time.sleep(1)
+ 
+#AT commands:
+ 
+import serial
+import time
+import sys
+ 
+port = serial.Serial("/dev/ttyUSB0", baudrate=115200, timeout=1)
+ 
+def read_sms():
+    port.write(b'AT+CMGL="ALL"\r\n')
+    print(port.readall())
+ 
+def read_sms_by_index(index):
+    port.write('AT+CMGR={}\r\n'.format(index))
+    print(port.readall())
+ 
+def read_all_contacts():
+    port.write("AT+CPBR=1,250\r\n")
+    time.sleep(1)
+    print(port.read(500).replace("+CPBR", "Contact ").replace("OK", ""))
+ 
+def add_contact():
+    port.write("AT+CPBW=,8489317681,128,vicky\r\n")
+    time.sleep(1)
+    print(port.read(50))
+ 
+def search_contact():
+    port.write("AT+CPBF=\"vicky\"\r\n")
+    time.sleep(1)
+    print(port.read(500))
+ 
+def dial_contact():
+    port.write("ATD8489317681;\r\n")
+    time.sleep(1)
+    print(port.read(50))
+ 
+def delete_contact():
+    port.write("AT+CPBW=2\r\n")
+    time.sleep(1)
+    print(port.read(50))
+ 
+def send_sms():
+    port.write('AT+CMGF=1\r\n')
+    port.write('AT+CMGS="+1234567890"\r\n')
+    port.write('Hello from Python!\x1A')
+    time.sleep(1)
+    print(port.read(50))
+ 
+def end_call():
+    port.write('ATH\r\n')  # Send ATH command to hang up the call
+    time.sleep(1)
+    print("Call ended")
+ 
+def receive_call():
+    port.write('ATA\r\n')  # Send ATA command to answer the call
+    time.sleep(1)
+    print("Call answered")
+ 
+def redial_missed_call():
+    port.write('AT+CPMS="ME"\r\n')  # Set preferred message storage
+    time.sleep(1)
+    port.write('AT+CPMS?\r\n')  # Check message storage status
+    time.sleep(1)
+    port.write('AT+CPBL?\r\n')  # Read missed call list
+    time.sleep(1)
+    response = port.read(100)
+    if "+CPBL: " in response:
+        missed_call_list = response.split("\r\n")[1:-2]  # Extract missed call list from response
+        last_missed_call = missed_call_list[-1].split(",")[1]  # Get the number of the last missed call
+        print("Redialing missed call to:", last_missed_call)
+        port.write('ATD' + last_missed_call + ';\r\n')  # Dial the last missed call number
+        time.sleep(1)
+    else:
+        print("No missed calls")
+ 
+read_sms()
+read_sms_by_index(1)
+read_all_contacts()
+add_contact()
+search_contact()
+dial_contact()
+delete_contact()
+send_sms()
+end_call()
+receive_call()
+redial_missed_call()
