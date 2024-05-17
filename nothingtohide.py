@@ -21,7 +21,7 @@ base_url = "https://results.kongu.edu/Photos_format/"
 suffix = ".jpeg"
 
 # List of example strings to encode and download
-example_strings = input("Enter Roll Numbers : \n").split()
+example_strings = input("Enter Roll Numbers eg.21CSR055 : \n").split()
 
 # Generate Base64 encoded filenames and attempt to download each
 for example_string in example_strings:
