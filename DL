@@ -578,3 +578,143 @@ print(f"Standard Deviation: {std_accuracy:.4f}")
 
 
 
+Experiment-8 Object Detection
+
+import tensorflow as tf
+from tensorflow.keras import layers, models
+import tensorflow_datasets as tfds
+import matplotlib.pyplot as plt
+
+# CNN Model for Feature Extraction
+def create_cnn(input_shape):
+    inputs = layers.Input(shape=input_shape)
+    x = layers.Conv2D(32, (3, 3), activation='relu')(inputs)
+    x = layers.MaxPooling2D((2, 2))(x)
+    x = layers.Conv2D(64, (3, 3), activation='relu')(x)
+    x = layers.MaxPooling2D((2, 2))(x)
+    x = layers.Conv2D(128, (3, 3), activation='relu')(x)
+    x = layers.MaxPooling2D((2, 2))(x)
+    x = layers.Flatten()(x)
+
+    return inputs, x
+
+# Model for Object Detection
+def create_object_detection_model(input_shape, num_classes):
+    inputs, cnn_output = create_cnn(input_shape)
+
+    # Classification Head (Softmax)
+    class_output = layers.Dense(num_classes, activation='softmax', name='class_output')(cnn_output)
+
+    # Bounding Box Regression Head (4 outputs: x, y, width, height)
+    bbox_output = layers.Dense(4, name='bbox_output')(cnn_output)
+
+    # Create the final model with two outputs (classification and bounding box regression)
+    model = models.Model(inputs=inputs, outputs=[class_output, bbox_output])
+
+    return model
+
+# Function to preprocess the data (normalize images, select the first object's bounding box and label)
+def preprocess(data):
+    image = tf.image.resize(data['image'], (128, 128)) / 255.0  # Resize and normalize the image
+
+    # Only consider the first object in the image for simplicity
+    bbox = data['objects']['bbox'][0]  # Use the first bounding box
+    label = data['objects']['label'][0]  # Use the first object's label
+
+    bbox = tf.cast(bbox, tf.float32)  # Bounding box as float32
+    label = tf.one_hot(label, depth=num_classes)  # One-hot encode the label for classification
+
+    return image, (label, bbox)  # Return label and bbox separately
+
+# Function to display images with bounding boxes and labels
+def display_samples(dataset, num_samples, class_names):
+    plt.figure(figsize=(15, 15))
+    for i, (image, (label, bbox)) in enumerate(dataset.take(num_samples)):
+        plt.subplot(1, num_samples, i + 1)
+        plt.imshow(image.numpy())
+
+        # Scale bbox back to image size (since the image is resized to 128x128)
+        height, width, _ = image.shape
+        bbox_scaled = [bbox[0] * height, bbox[1] * width, bbox[2] * height, bbox[3] * width]
+
+        # Draw a bounding box (x, y, width, height)
+        rect = plt.Rectangle((bbox_scaled[1], bbox_scaled[0]),  # Top-left corner (y, x)
+                             bbox_scaled[3] - bbox_scaled[1],  # Width
+                             bbox_scaled[2] - bbox_scaled[0],  # Height
+                             fill=False, color='red', linewidth=2)
+        plt.gca().add_patch(rect)
+
+        # Find the class index and label
+        class_index = tf.argmax(label).numpy()
+        class_label = class_names[class_index]
+
+        # Display the object label
+        plt.text(bbox_scaled[1], bbox_scaled[0] - 10, class_label, color='blue', fontsize=12, backgroundcolor='white')
+
+        plt.axis('off')
+    plt.show()
+
+# Parameters
+input_shape = (128, 128, 3)  # Image dimensions
+num_classes = 21  # 20 object classes + 1 background
+
+# Load the PASCAL VOC 2007 dataset
+dataset, info = tfds.load("voc/2007", split='train', with_info=True)
+class_names = info.features['objects']['label'].names  # Get the class names
+
+train_dataset = dataset.map(preprocess).batch(32).prefetch(tf.data.experimental.AUTOTUNE)
+
+# Display some samples from the dataset with object labels and bounding boxes
+display_samples(dataset.map(preprocess), num_samples=5, class_names=class_names)
+
+# Create the object detection model
+model = create_object_detection_model(input_shape, num_classes)
+
+# Compile the model with separate losses for classification and bounding box regression
+model.compile(optimizer='adam',
+              loss={'class_output': 'categorical_crossentropy', 'bbox_output': 'mean_squared_error'},
+              metrics={'class_output': 'accuracy'})
+
+# Display the model architecture
+model.summary()
+
+# Train the model
+history = model.fit(train_dataset, epochs=10)
+
+# Plot training & validation accuracy and loss
+def plot_history(history):
+    print(history.history.keys())  # Check available keys
+
+    # Accuracy
+    plt.figure(figsize=(12, 4))
+
+    plt.subplot(1, 2, 1)
+    plt.plot(history.history['class_output_accuracy'], label='Classification Accuracy')
+    plt.title('Classification Accuracy')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy')
+    plt.legend()
+
+    # Losses
+    plt.subplot(1, 2, 2)
+
+
+    plt.plot(history.history['loss'], label='Total Loss')
+
+    # Adjust if loss names are different
+    if 'class_output_loss' in history.history:
+        plt.plot(history.history['class_output_loss'], label='Classification Loss')
+    if 'bbox_output_loss' in history.history:
+        plt.plot(history.history['bbox_output_loss'], label='Bounding Box Loss')
+
+    plt.title('Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+
+    plt.show()
+
+# Call the function to plot the graph
+plot_history(history)
+
+
